@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Session</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <div class="container">
+    <div class="row">
+      <a href="/">← back</a>
+      <span id="title" class="pill"></span>
+      <span id="conn" class="small"></span>
+    </div>
+
+    <div class="card">
+      <div class="output" id="output"><pre id="pre"></pre></div>
+
+      <div class="footerBar">
+        <div class="pills" id="promptBar" style="display:none;">
+          <span class="pill">Prompt:</span>
+          <button id="yesBtn" class="primary">Yes (y)</button>
+          <button id="noBtn" class="danger">No (n)</button>
+          <button id="enterBtn">Enter</button>
+          <span id="promptHint" class="small"></span>
+        </div>
+
+        <div class="row">
+          <input id="input" placeholder="输入内容，回车发送" style="flex:1; min-width: 220px;" />
+          <button id="sendBtn" class="primary">Send</button>
+          <button id="ctrlcBtn" class="danger">Ctrl+C</button>
+        </div>
+
+        <div class="small" style="margin-top:8px;">
+          自动滚动：<span id="autoscroll" class="pill">ON</span>
+          <button id="jumpBtn" style="display:none;">跳到最新</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/session.js"></script>
+</body>
+</html>
