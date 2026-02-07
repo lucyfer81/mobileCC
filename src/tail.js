@@ -9,6 +9,9 @@ function stripAnsi(text) {
   // OSC 序列
   cleaned = cleaned.replace(/\x1b\][^\x07]*\x07/g, '');
   cleaned = cleaned.replace(/\x1b\][^\x1b]*\x1b\\/g, '');
+  // 清理回车符（CR），只保留换行符（LF）
+  cleaned = cleaned.replace(/\r\n/g, '\n');  // Windows CRLF -> LF
+  cleaned = cleaned.replace(/\r/g, '');      // 单独 CR 删除
   return cleaned;
 }
 
