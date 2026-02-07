@@ -1,0 +1,120 @@
+:root {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+body {
+  margin: 0;
+  background: #0b0f14;
+  color: #e6edf3;
+}
+
+a {
+  color: #8ab4f8;
+  text-decoration: none;
+}
+
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.card {
+  background: #0f1621;
+  border: 1px solid #1f2a3a;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+input, button {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #2b3a52;
+  background: #0b1220;
+  color: #e6edf3;
+}
+
+button {
+  cursor: pointer;
+}
+
+button.primary {
+  background: #1b4ddb;
+  border-color: #2b5fff;
+}
+
+button.danger {
+  background: #7a1b1b;
+  border-color: #a33;
+}
+
+.small {
+  opacity: 0.85;
+  font-size: 12px;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.35;
+  font-size: 14px;
+}
+
+.output {
+  height: 60vh;
+  overflow: auto;
+  padding: 12px;
+  background: #060a10;
+  border-radius: 12px;
+  border: 1px solid #1f2a3a;
+}
+
+.footerBar {
+  position: sticky;
+  bottom: 0;
+  background: rgba(11,15,20,0.92);
+  backdrop-filter: blur(6px);
+  padding: 12px 0 0 0;
+}
+
+.pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.pill {
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid #2b3a52;
+  background: #0b1220;
+}
+
+.toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(27, 77, 219, 0.9);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.toast.show {
+  opacity: 1;
+}
