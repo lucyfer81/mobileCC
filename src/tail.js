@@ -1,10 +1,14 @@
 import { spawn } from "node:child_process";
 
 function stripAnsi(text) {
-  let cleaned = text.replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '');
+  let cleaned = text;
+  // CSI 序列（颜色、光标等）
+  cleaned = cleaned.replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '');
+  // DEC 私有模式（? + 数字 + h/l）
+  cleaned = cleaned.replace(/\x1b\[[?][0-9;]*[hl]/g, '');
+  // OSC 序列
   cleaned = cleaned.replace(/\x1b\][^\x07]*\x07/g, '');
   cleaned = cleaned.replace(/\x1b\][^\x1b]*\x1b\\/g, '');
-  cleaned = cleaned.replace(/\x1b\[?[0-9;]*[A-Z]/g, '');
   return cleaned;
 }
 

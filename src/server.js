@@ -7,6 +7,20 @@ import fs from "node:fs";
 import { mustSessionName, safeJson, httpError } from "./util.js";
 import { listSessions, hasSession, ensureLogDir, logPathFor, ensurePipePane, sendKeys, sendControl } from "./tmux.js";
 import { createTailFollower } from "./tail.js";
+import { readFile } from "node:fs/promises";
+
+// ANSI 清理函数（从 tail.js 复制过来，因为 log API 需要用）
+function stripAnsi(text) {
+  let cleaned = text;
+  // CSI 序列（颜色、光标等）
+  cleaned = cleaned.replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '');
+  // DEC 私有模式（? + 数字 + h/l）
+  cleaned = cleaned.replace(/\x1b\[[?][0-9;]*[hl]/g, '');
+  // OSC 序列
+  cleaned = cleaned.replace(/\x1b\][^\x07]*\x07/g, '');
+  cleaned = cleaned.replace(/\x1b\][^\x1b]*\x1b\\/g, '');
+  return cleaned;
+}
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 5002;
 const LOG_DIR = process.env.LOG_DIR || path.join(process.cwd(), "data", "logs");
@@ -104,14 +118,23 @@ app.get("/api/sessions/:name/log", async (req, res) => {
     const name = mustSessionName(req.params.name);
     const logFile = logPathFor(LOG_DIR, name);
     const tailBytes = Math.max(1000, Math.min(200_000, Number(req.query.tail || 20_000)));
-    fs.stat(logFile, (err, st) => {
-      if (err) return res.status(404).send("log not found");
-      const start = Math.max(0, st.size - tailBytes);
-      const rs = fs.createReadStream(logFile, { start, end: st.size });
-      res.setHeader("Content-Type", "text/plain; charset=utf-8");
-      rs.pipe(res);
-    });
+
+    // 读取文件内容
+    const content = await readFile(logFile, 'utf-8');
+
+    // 获取最后 N 字节
+    const start = Math.max(0, content.length - tailBytes);
+    const rawLog = content.slice(start);
+
+    // 应用 ANSI 清理
+    const cleanLog = stripAnsi(rawLog);
+
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.send(cleanLog);
   } catch (e) {
+    if (e.code === 'ENOENT') {
+      return res.status(404).send("log not found");
+    }
     httpError(res, e);
   }
 });
