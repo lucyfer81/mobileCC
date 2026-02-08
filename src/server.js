@@ -11,7 +11,39 @@ import { readFile } from "node:fs/promises";
 
 // ANSI 清理函数（从 tail.js 复制过来，因为 log API 需要用）
 function stripAnsi(text) {
-  let cleaned = text;
+  // 按行处理，对每一行单独处理 \r 覆盖，然后再连接
+  const lines = text.split('\n');
+  const processedLines = lines.map(line => {
+    // 先去掉行尾所有连续的 \r（如果有的话）
+    let trimmed = line;
+    while (trimmed.endsWith('\r')) {
+      trimmed = trimmed.slice(0, -1);
+    }
+
+    // 如果整行都是空的，直接返回空字符串
+    if (!trimmed) {
+      return '';
+    }
+
+    // 按 \r 分割，只保留最后一段
+    const parts = trimmed.split(/\r/);
+    const lastPart = parts[parts.length - 1];
+
+    // 如果最后一段是空的，检查是否有其他非空段
+    if (!lastPart && parts.length > 1) {
+      // 从后往前找第一个非空段
+      for (let i = parts.length - 2; i >= 0; i--) {
+        if (parts[i]) {
+          return parts[i];
+        }
+      }
+    }
+
+    return lastPart;
+  });
+
+  let cleaned = processedLines.join('\n');
+
   // CSI 序列（颜色、光标等）
   cleaned = cleaned.replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '');
   // DEC 私有模式（? + 数字 + h/l）
@@ -19,9 +51,11 @@ function stripAnsi(text) {
   // OSC 序列
   cleaned = cleaned.replace(/\x1b\][^\x07]*\x07/g, '');
   cleaned = cleaned.replace(/\x1b\][^\x1b]*\x1b\\/g, '');
-  // 清理回车符（CR），只保留换行符（LF）
+
+  // 清理剩余的回车符（CR），只保留换行符（LF）
   cleaned = cleaned.replace(/\r\n/g, '\n');  // Windows CRLF -> LF
   cleaned = cleaned.replace(/\r/g, '');      // 单独 CR 删除
+
   return cleaned;
 }
 
