@@ -16,7 +16,17 @@ MobileCC 是一个基于 Node.js 的 Web 应用，允许你通过手机浏览器
 
 ## 📸 截图
 
-（项目截图待添加）
+### Session 列表页
+
+![Session 列表页](docs/screenshots/mobile_list.png)
+
+选择或输入 tmux session 名称进行连接，支持快速访问常用会话。
+
+### Session 连接页
+
+![Session 连接页](docs/screenshots/mobile_session.png)
+
+实时查看 tmux 输出，发送命令，使用快捷按钮操作。
 
 ## 🚀 快速开始
 
