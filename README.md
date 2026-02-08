@@ -6,7 +6,7 @@ MobileCC 是一个基于 Node.js 的 Web 应用，允许你通过手机浏览器
 
 ## 💡 项目定位
 
-**MobileCC 是一个专为个人使用设计的轻量级工具，灵感来源于开源项目 [happy](https://github.com/icyorbstream/happy)。**
+**MobileCC 是一个专为个人使用设计的轻量级工具，灵感来源于开源项目 [happy](https://github.com/slopus/happy)。**
 
 ### ✅ 本项目的目标
 
@@ -327,7 +327,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 🙏 致谢
 
-- **[happy](https://github.com/icyorbstream/happy)** - 本项目深受 happy 启发，happy 是一个优秀的 tmux Web 客户端项目
+- **[happy](https://github.com/slopus/happy)** - 本项目深受 happy 启发，happy 是一个优秀的 tmux Web 客户端项目
 - tmux - 强大的终端复用器
 - Express - Node.js Web 框架
 - ws - WebSocket 库
