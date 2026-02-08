@@ -4,6 +4,35 @@
 
 MobileCC 是一个基于 Node.js 的 Web 应用，允许你通过手机浏览器远程控制服务器上的 tmux sessions。特别适合在移动设备上监控长时间运行的命令行任务，如 Claude Code 开发会话。
 
+## 💡 项目定位
+
+**MobileCC 是一个专为个人使用设计的轻量级工具，灵感来源于开源项目 [happy](https://github.com/icyorbstream/happy)。**
+
+### ✅ 本项目的目标
+
+- 为个人提供简洁的 tmux 移动端控制方案
+- 移动端友好的界面设计
+- 实时查看和管理 tmux sessions
+- 轻量级部署，无复杂依赖
+- 配合 Cloudflare Zero Trust 等安全方案使用
+
+### ❌ 本项目明确不做的
+
+- **多用户系统** - 不支持多用户管理，每个用户部署独立实例
+- **权限管理** - 不内置用户认证和权限控制
+- **会话隔离** - 所有 tmux sessions 对访问者可见
+- **生产级安全** - 安全依赖外部方案（如 Cloudflare Zero Trust）
+
+### 🔒 推荐的安全部署方案
+
+个人使用场景下，建议配合以下方案保护内网安全：
+
+- **Cloudflare Zero Trust / Cloudflare Access** - 提供身份验证和零信任网络访问
+- **Cloudflare Tunnel** - 安全暴露内网服务，无需开放端口
+- **内网部署** - 仅在局域网内使用，配合 VPN 访问
+
+**本项目的安全假设：** 在 Cloudflare Zero Trust 保护下，所有访问者都是可信的个人用户，因此不实现额外的认证和权限机制。
+
 ## ✨ 特性
 
 - 🎯 **实时输出查看** - WebSocket 实时推送 tmux session 输出
@@ -256,10 +285,37 @@ PORT=3000 npm start
 
 ## 🔐 安全建议
 
-- **不要暴露到公网**（除非使用 HTTPS + 认证）
-- **使用 Cloudflare Access** 或类似服务保护访问
-- **限制 API 访问**（如果需要，可以添加认证中间件）
-- **定期清理日志**（避免敏感信息泄露）
+**⚠️ 重要提示：** MobileCC **不内置任何认证或权限管理系统**。在部署到公网或可访问的网络前，**必须**配置以下安全方案之一：
+
+### 推荐方案（个人使用）
+
+**1. Cloudflare Zero Trust（强烈推荐）**
+
+- 使用 [Cloudflare Zero Trust](https://www.cloudflare.com/products/zero-trust/) 保护应用
+- 配置 One-Time PIN、Google OAuth 或其他身份验证方式
+- 通过 Cloudflare Tunnel 安全暴露服务，无需开放服务器端口
+
+**2. 内网 + VPN**
+
+- 仅在局域网内部署
+- 配合 VPN（如 WireGuard、Tailscale）远程访问
+
+**3. 反向代理 + 基础认证**
+
+- 使用 nginx 配置 HTTP Basic Authentication
+- 仅适用于可信网络环境
+
+### 绝对不要做的
+
+- ❌ **不要直接将服务暴露到公网**（如 `0.0.0.0:5002`）
+- ❌ **不要在无认证的情况下通过公网 IP 访问**
+- ❌ **不要在共享服务器上使用**
+
+### 其他安全实践
+
+- 定期清理 `data/logs/` 目录中的日志文件（可能包含敏感信息）
+- 使用 HTTPS（通过 Cloudflare 或 nginx 配置 SSL）
+- 限制日志文件的访问权限
 
 ## 🤝 贡献
 
@@ -271,9 +327,11 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 🙏 致谢
 
+- **[happy](https://github.com/icyorbstream/happy)** - 本项目深受 happy 启发，happy 是一个优秀的 tmux Web 客户端项目
 - tmux - 强大的终端复用器
 - Express - Node.js Web 框架
 - ws - WebSocket 库
+- Cloudflare - Zero Trust 和 Tunnel 服务，让个人工具安全地暴露到公网
 
 ## 📮 联系方式
 
