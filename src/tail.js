@@ -3,16 +3,24 @@ import { spawn } from "node:child_process";
 function stripAnsi(text) {
   // 按行处理，对每一行单独处理 \r 覆盖，然后再连接
   const lines = text.split('\n');
-  const processedLines = lines.map(line => {
+  const processedLines = [];
+
+  for (let line of lines) {
+    // 跳过包含光标上移序列的行（这是终端定位动画，在HTML中无法正确渲染）
+    // \x1b[\d+A 表示光标上移 n 行
+    if (/\x1b\[[0-9]+A/.test(line)) {
+      continue;
+    }
+
     // 先去掉行尾所有连续的 \r（如果有的话）
     let trimmed = line;
     while (trimmed.endsWith('\r')) {
       trimmed = trimmed.slice(0, -1);
     }
 
-    // 如果整行都是空的，直接返回空字符串
+    // 跳过空行
     if (!trimmed) {
-      return '';
+      continue;
     }
 
     // 按 \r 分割，只保留最后一段
@@ -24,13 +32,14 @@ function stripAnsi(text) {
       // 从后往前找第一个非空段
       for (let i = parts.length - 2; i >= 0; i--) {
         if (parts[i]) {
-          return parts[i];
+          processedLines.push(parts[i]);
+          break;
         }
       }
+    } else if (lastPart) {
+      processedLines.push(lastPart);
     }
-
-    return lastPart;
-  });
+  }
 
   let cleaned = processedLines.join('\n');
 
