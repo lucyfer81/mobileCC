@@ -6,12 +6,6 @@ function stripAnsi(text) {
   const processedLines = [];
 
   for (let line of lines) {
-    // 跳过包含光标上移序列的行（这是终端定位动画，在HTML中无法正确渲染）
-    // \x1b[\d+A 表示光标上移 n 行
-    if (/\x1b\[[0-9]+A/.test(line)) {
-      continue;
-    }
-
     // 先去掉行尾所有连续的 \r（如果有的话）
     let trimmed = line;
     while (trimmed.endsWith('\r')) {
@@ -23,21 +17,48 @@ function stripAnsi(text) {
       continue;
     }
 
-    // 按 \r 分割，只保留最后一段
-    const parts = trimmed.split(/\r/);
-    const lastPart = parts[parts.length - 1];
+    // 检查是否是纯spinner动画（包含光标上移但没有实质文本）
+    const withoutAnsi = trimmed
+      .replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '')
+      .replace(/\x1b\[[?][0-9;]*[hl]/g, '')
+      .replace(/\x1b\][^\x07]*\x07/g, '')
+      .replace(/\x1b\][^\x1b]*\x1b\\/g, '')
+      .replace(/\r/g, '')
+      .trim();
 
-    // 如果最后一段是空的，检查是否有其他非空段
-    if (!lastPart && parts.length > 1) {
-      // 从后往前找第一个非空段
-      for (let i = parts.length - 2; i >= 0; i--) {
-        if (parts[i]) {
-          processedLines.push(parts[i]);
-          break;
-        }
+    const hasCursorUp = /\x1b\[[0-9]+A/.test(line);
+    const isShort = withoutAnsi.length < 10;
+    const isSpinnerOnly = /^[✻✽✶✢·●*⠂⠐…]+$/.test(withoutAnsi);
+
+    // 如果是纯spinner动画，跳过
+    if (hasCursorUp && (isShort || isSpinnerOnly)) {
+      continue;
+    }
+
+    // 按 \r 分割，找到最有实质内容的那个部分
+    const parts = trimmed.split(/\r/);
+
+    // 找到去除ANSI后最有内容的part（不是纯空格）
+    let bestPart = '';
+    let bestContentLength = 0;
+
+    for (const part of parts) {
+      const content = part
+        .replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '')
+        .replace(/\x1b\[[?][0-9;]*[hl]/g, '')
+        .replace(/\x1b\][^\x07]*\x07/g, '')
+        .replace(/\x1b\][^\x1b]*\x1b\\/g, '')
+        .replace(/\r/g, '')
+        .trim();
+
+      if (content.length > bestContentLength) {
+        bestContentLength = content.length;
+        bestPart = part;
       }
-    } else if (lastPart) {
-      processedLines.push(lastPart);
+    }
+
+    if (bestPart) {
+      processedLines.push(bestPart);
     }
   }
 
