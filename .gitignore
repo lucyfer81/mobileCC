@@ -119,3 +119,12 @@ Thumbs.db
 *.gif
 !docs/screenshots/*.png
 !docs/screenshots/*.jpg
+
+# Log files (may contain sensitive session data)
+data/logs/*.log
+
+# Local configuration files
+.claude/settings.local.json
+
+# Local environment paths
+.claude/settings.local.*.json
