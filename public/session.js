@@ -26,6 +26,14 @@ function append(text) {
   }
 }
 
+function replaceOutput(text) {
+  pre.textContent = text;
+  if (autoScroll) {
+    out.scrollTop = out.scrollHeight;
+    document.getElementById("jumpBtn").style.display = "none";
+  }
+}
+
 out.addEventListener("scroll", () => {
   const nearBottom = (out.scrollHeight - out.scrollTop - out.clientHeight) < 40;
   autoScroll = nearBottom;
@@ -54,11 +62,10 @@ async function attach() {
 
 async function loadTail() {
   if (!session) return;
-  const r = await fetch(`/api/sessions/${encodeURIComponent(session)}/log?tail=40000`);
+  const r = await fetch(`/api/sessions/${encodeURIComponent(session)}/log?lines=400`);
   if (r.ok) {
     const t = await r.text();
-    pre.textContent = t;
-    out.scrollTop = out.scrollHeight;
+    replaceOutput(t);
   }
 }
 
@@ -122,8 +129,10 @@ async function main() {
 
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
+    if (msg.type === "snapshot") replaceOutput(msg.data);
     if (msg.type === "chunk") append(msg.data);
     if (msg.type === "input-activity") showToast("📱 其他设备刚刚输入了内容");
+    if (msg.type === "error") append(`\n[server] ${msg.error || "stream error"}\n`);
   };
 }
 

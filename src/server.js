@@ -4,26 +4,22 @@ import path from "node:path";
 import { WebSocketServer } from "ws";
 
 import { mustSessionName, safeJson, httpError } from "./util.js";
-import { listSessions, hasSession, ensureLogDir, logPathFor, ensurePipePane, sendKeys, sendControl } from "./tmux.js";
-import { createTailFollower } from "./tail.js";
-import { readFile } from "node:fs/promises";
-import { decodeUtf8Tail, sanitizeTerminalText } from "./terminal-text.js";
+import { listSessions, hasSession, sendKeys, sendControl, capturePane } from "./tmux.js";
+import { createPaneFollower } from "./pane-follower.js";
+import { sanitizeTerminalText } from "./terminal-text.js";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 5002;
-const LOG_DIR = process.env.LOG_DIR || path.join(process.cwd(), "data", "logs");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(process.cwd(), "public")));
-
-await ensureLogDir(LOG_DIR);
 
 const streams = new Map();
 
 function getOrCreateStream(sessionName) {
   let s = streams.get(sessionName);
   if (!s) {
-    s = { clients: new Set(), follower: null };
+    s = { clients: new Set(), follower: null, lastSnapshot: "" };
     streams.set(sessionName, s);
   }
   return s;
@@ -56,14 +52,22 @@ app.post("/api/sessions/:name/attach", async (req, res) => {
       throw err;
     }
 
-    const logFile = logPathFor(LOG_DIR, name);
-    await ensurePipePane(name, logFile);
-
     const stream = getOrCreateStream(name);
     if (!stream.follower) {
-      stream.follower = createTailFollower(logFile, (chunk) => {
-        broadcast(name, { type: "chunk", session: name, data: chunk });
-      });
+      stream.follower = createPaneFollower(
+        name,
+        (snapshot) => {
+          stream.lastSnapshot = snapshot;
+          broadcast(name, { type: "snapshot", session: name, data: snapshot });
+        },
+        (err) => {
+          broadcast(name, {
+            type: "error",
+            session: name,
+            error: err?.message || "capture pane failed"
+          });
+        }
+      );
     }
 
     safeJson(res, { ok: true, session: name });
@@ -103,22 +107,19 @@ app.post("/api/sessions/:name/control", async (req, res) => {
 app.get("/api/sessions/:name/log", async (req, res) => {
   try {
     const name = mustSessionName(req.params.name);
-    const logFile = logPathFor(LOG_DIR, name);
-    const tailBytes = Math.max(1000, Math.min(200_000, Number(req.query.tail || 20_000)));
+    if (!(await hasSession(name))) {
+      const err = new Error(`tmux session not found: ${name}`);
+      err.status = 404;
+      throw err;
+    }
+    const lines = Math.max(50, Math.min(5000, Number(req.query.lines || 400)));
 
-    // 按字节截取末尾内容，再安全解码 UTF-8，避免截断多字节字符导致乱码
-    const content = await readFile(logFile);
-    const rawLog = decodeUtf8Tail(content, tailBytes);
-
-    // 应用 ANSI 清理
+    const rawLog = await capturePane(name, -lines, -1);
     const cleanLog = sanitizeTerminalText(rawLog);
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.send(cleanLog);
   } catch (e) {
-    if (e.code === 'ENOENT') {
-      return res.status(404).send("log not found");
-    }
     httpError(res, e);
   }
 });
@@ -140,6 +141,9 @@ wss.on("connection", (ws, req) => {
 
   const stream = getOrCreateStream(sessionName);
   stream.clients.add(ws);
+  if (stream.lastSnapshot && ws.readyState === ws.OPEN) {
+    ws.send(JSON.stringify({ type: "snapshot", session: sessionName, data: stream.lastSnapshot }));
+  }
 
   ws.on("close", () => {
     stream.clients.delete(ws);
@@ -152,5 +156,4 @@ wss.on("connection", (ws, req) => {
 
 server.listen(PORT, () => {
   console.log(`mobilecc listening on http://127.0.0.1:${PORT}`);
-  console.log(`LOG_DIR=${LOG_DIR}`);
 });

@@ -67,6 +67,22 @@ export async function sendControl(sessionName, action) {
   throw err;
 }
 
+export async function capturePane(sessionName, startLine = -300, endLine = -1) {
+  const target = `${sessionName}:0.0`;
+  const { stdout } = await tmux([
+    "capture-pane",
+    "-p",
+    "-J",
+    "-t",
+    target,
+    "-S",
+    String(startLine),
+    "-E",
+    String(endLine)
+  ]);
+  return stdout;
+}
+
 function escapeShellArg(p) {
   return `'${String(p).replace(/'/g, `'\\''`)}'`;
 }
