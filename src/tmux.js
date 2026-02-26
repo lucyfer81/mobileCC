@@ -9,6 +9,22 @@ async function tmux(args) {
   return await execFileAsync("tmux", args, { encoding: "utf8" });
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function resolveActiveTarget(sessionName) {
+  const { stdout } = await tmux([
+    "display-message",
+    "-p",
+    "-t",
+    sessionName,
+    "#{session_name}:#{window_index}.#{pane_index}"
+  ]);
+  const target = stdout.trim();
+  return target || `${sessionName}:0.0`;
+}
+
 export async function listSessions() {
   try {
     const { stdout } = await tmux(["list-sessions", "-F", "#{session_name}"]);
@@ -40,20 +56,35 @@ export function logPathFor(logDir, sessionName) {
 
 export async function ensurePipePane(sessionName, logFile) {
   await fs.appendFile(logFile, "");
-  const target = `${sessionName}:0.0`;
+  const target = await resolveActiveTarget(sessionName);
   await tmux(["pipe-pane", "-t", target, "-o", `cat >> ${escapeShellArg(logFile)}`]);
 }
 
-export async function sendKeys(sessionName, text, enter = true) {
-  const target = `${sessionName}:0.0`;
-  await tmux(["send-keys", "-t", target, text]);
+function mapSubmitSequence(submitKey) {
+  if (submitKey === "enter") return ["C-m"];
+  if (submitKey === "esc_enter") return ["Escape", "C-m"];
+  // Codex commonly uses "tab to queue message" then Enter to send.
+  if (submitKey === "tab") return ["Tab", "C-m", "C-m"];
+  if (submitKey === "ctrl_j") return ["C-j"];
+  return ["Tab", "C-m", "C-m"];
+}
+
+export async function sendKeys(sessionName, text, enter = true, submitKey = "tab") {
+  const target = await resolveActiveTarget(sessionName);
+  await tmux(["send-keys", "-t", target, "-l", text]);
+  // Give TUI a short moment to process pasted text before submit keys.
+  await sleep(80);
   if (enter) {
-    await tmux(["send-keys", "-t", target, "Enter"]);
+    const sequence = mapSubmitSequence(submitKey);
+    for (const key of sequence) {
+      await tmux(["send-keys", "-t", target, key]);
+      await sleep(40);
+    }
   }
 }
 
 export async function sendControl(sessionName, action) {
-  const target = `${sessionName}:0.0`;
+  const target = await resolveActiveTarget(sessionName);
   if (action === "ctrl_c") {
     await tmux(["send-keys", "-t", target, "C-c"]);
     return;
@@ -62,13 +93,26 @@ export async function sendControl(sessionName, action) {
     await tmux(["send-keys", "-t", target, "Enter"]);
     return;
   }
+  if (action === "ctrl_j") {
+    await tmux(["send-keys", "-t", target, "C-j"]);
+    return;
+  }
+  if (action === "esc_enter") {
+    await tmux(["send-keys", "-t", target, "Escape"]);
+    await tmux(["send-keys", "-t", target, "C-m"]);
+    return;
+  }
+  if (action === "tab") {
+    await tmux(["send-keys", "-t", target, "Tab"]);
+    return;
+  }
   const err = new Error("Unknown control action");
   err.status = 400;
   throw err;
 }
 
 export async function capturePane(sessionName, startLine = -300, endLine = -1) {
-  const target = `${sessionName}:0.0`;
+  const target = await resolveActiveTarget(sessionName);
   const { stdout } = await tmux([
     "capture-pane",
     "-p",

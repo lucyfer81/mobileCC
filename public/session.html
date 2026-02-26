@@ -24,12 +24,18 @@
           <span class="pill">Prompt:</span>
           <button id="yesBtn" class="primary">Yes (y)</button>
           <button id="noBtn" class="danger">No (n)</button>
-          <button id="enterBtn">Enter</button>
+          <button id="enterBtn">提交键</button>
           <span id="promptHint" class="small"></span>
         </div>
 
         <div class="row">
           <input id="input" placeholder="输入内容，回车发送" style="flex:1; min-width: 220px;" />
+          <select id="submitKeySelect" title="选择提交键">
+            <option value="tab">Tab + Enter (Codex)</option>
+            <option value="ctrl_j">Ctrl+J</option>
+            <option value="enter">Enter</option>
+            <option value="esc_enter">Esc + Enter (Vim)</option>
+          </select>
           <button id="sendBtn" class="primary">Send</button>
           <button id="ctrlcBtn" class="danger">Ctrl+C</button>
         </div>

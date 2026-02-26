@@ -80,12 +80,15 @@ app.post("/api/sessions/:name/input", async (req, res) => {
   try {
     const name = mustSessionName(req.params.name);
     const text = String(req.body?.text ?? "");
+    const rawSubmitKey = String(req.body?.submitKey ?? "tab");
+    const submitKey = ["ctrl_j", "enter", "esc_enter", "tab"].includes(rawSubmitKey) ? rawSubmitKey : "tab";
     if (!text.trim()) {
       const err = new Error("Empty input");
       err.status = 400;
       throw err;
     }
-    await sendKeys(name, text, true);
+    await sendKeys(name, text, true, submitKey);
+    console.log(`[input] session=${name} submitKey=${submitKey} textLen=${text.length}`);
     broadcast(name, { type: "input-activity", source: "unknown", timestamp: Date.now() });
     safeJson(res, { ok: true });
   } catch (e) {

@@ -6,8 +6,31 @@ const conn = document.getElementById("conn");
 const pre = document.getElementById("pre");
 const out = document.getElementById("output");
 const toast = document.getElementById("toast");
+const submitKeySelect = document.getElementById("submitKeySelect");
 
 let autoScroll = true;
+const SUBMIT_KEY_STORAGE_KEY = "mobilecc.submitKey";
+
+function getSubmitKey() {
+  if (!submitKeySelect) return "tab";
+  if (submitKeySelect.value === "tab") return "tab";
+  if (submitKeySelect.value === "enter") return "enter";
+  if (submitKeySelect.value === "esc_enter") return "esc_enter";
+  return "tab";
+}
+
+function loadSubmitKeyPreference() {
+  const saved = localStorage.getItem(SUBMIT_KEY_STORAGE_KEY);
+  if (saved === "enter" || saved === "ctrl_j" || saved === "esc_enter" || saved === "tab") {
+    submitKeySelect.value = saved;
+  } else {
+    submitKeySelect.value = "tab";
+  }
+}
+
+function saveSubmitKeyPreference() {
+  localStorage.setItem(SUBMIT_KEY_STORAGE_KEY, getSubmitKey());
+}
 
 function showToast(message) {
   toast.textContent = message;
@@ -73,7 +96,7 @@ async function sendInput(text) {
   const r = await fetch(`/api/sessions/${encodeURIComponent(session)}/input`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, submitKey: getSubmitKey() })
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
@@ -109,14 +132,30 @@ document.getElementById("input").addEventListener("keydown", (e) => {
 
 document.getElementById("yesBtn").onclick = () => sendInput("y");
 document.getElementById("noBtn").onclick = () => sendInput("n");
-document.getElementById("enterBtn").onclick = () => sendCtrl("enter");
+document.getElementById("enterBtn").onclick = () => {
+  if (getSubmitKey() === "esc_enter") {
+    sendCtrl("esc_enter");
+    return;
+  }
+  if (getSubmitKey() === "tab") {
+    sendCtrl("tab");
+    return;
+  }
+  if (getSubmitKey() === "enter") {
+    sendCtrl("enter");
+    return;
+  }
+  sendCtrl("ctrl_j");
+};
 document.getElementById("ctrlcBtn").onclick = () => sendCtrl("ctrl_c");
+submitKeySelect?.addEventListener("change", saveSubmitKeyPreference);
 
 async function main() {
   if (!session) {
     append("missing session param\n");
     return;
   }
+  loadSubmitKeyPreference();
   await attach();
   await loadTail();
 
