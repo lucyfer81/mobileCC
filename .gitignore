@@ -128,3 +128,11 @@ data/logs/*.log
 
 # Local environment paths
 .claude/settings.local.*.json
+
+# Local service/deployment files (machine-specific)
+docs/SERVICE_SETUP.md
+ecosystem.config.cjs
+fix-service.sh
+install-pm2.sh
+install-service.sh
+mobilecc.service
