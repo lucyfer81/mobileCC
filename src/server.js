@@ -2,92 +2,12 @@ import express from "express";
 import http from "node:http";
 import path from "node:path";
 import { WebSocketServer } from "ws";
-import fs from "node:fs";
 
 import { mustSessionName, safeJson, httpError } from "./util.js";
 import { listSessions, hasSession, ensureLogDir, logPathFor, ensurePipePane, sendKeys, sendControl } from "./tmux.js";
 import { createTailFollower } from "./tail.js";
 import { readFile } from "node:fs/promises";
-
-// ANSI 清理函数（从 tail.js 复制过来，因为 log API 需要用）
-function stripAnsi(text) {
-  // 按行处理，对每一行单独处理 \r 覆盖，然后再连接
-  const lines = text.split('\n');
-  const processedLines = [];
-
-  for (let line of lines) {
-    // 先去掉行尾所有连续的 \r（如果有的话）
-    let trimmed = line;
-    while (trimmed.endsWith('\r')) {
-      trimmed = trimmed.slice(0, -1);
-    }
-
-    // 跳过空行
-    if (!trimmed) {
-      continue;
-    }
-
-    // 检查是否是纯spinner动画（包含光标上移但没有实质文本）
-    const withoutAnsi = trimmed
-      .replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '')
-      .replace(/\x1b\[[?][0-9;]*[hl]/g, '')
-      .replace(/\x1b\][^\x07]*\x07/g, '')
-      .replace(/\x1b\][^\x1b]*\x1b\\/g, '')
-      .replace(/\r/g, '')
-      .trim();
-
-    const hasCursorUp = /\x1b\[[0-9]+A/.test(line);
-    const isShort = withoutAnsi.length < 10;
-    const isSpinnerOnly = /^[✻✽✶✢·●*⠂⠐…]+$/.test(withoutAnsi);
-
-    // 如果是纯spinner动画，跳过
-    if (hasCursorUp && (isShort || isSpinnerOnly)) {
-      continue;
-    }
-
-    // 按 \r 分割，找到最有实质内容的那个部分
-    const parts = trimmed.split(/\r/);
-
-    // 找到去除ANSI后最有内容的part（不是纯空格）
-    let bestPart = '';
-    let bestContentLength = 0;
-
-    for (const part of parts) {
-      const content = part
-        .replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '')
-        .replace(/\x1b\[[?][0-9;]*[hl]/g, '')
-        .replace(/\x1b\][^\x07]*\x07/g, '')
-        .replace(/\x1b\][^\x1b]*\x1b\\/g, '')
-        .replace(/\r/g, '')
-        .trim();
-
-      if (content.length > bestContentLength) {
-        bestContentLength = content.length;
-        bestPart = part;
-      }
-    }
-
-    if (bestPart) {
-      processedLines.push(bestPart);
-    }
-  }
-
-  let cleaned = processedLines.join('\n');
-
-  // CSI 序列（颜色、光标等）
-  cleaned = cleaned.replace(/\x1b\[[0-9;]*[mGKHfABCD]/g, '');
-  // DEC 私有模式（? + 数字 + h/l）
-  cleaned = cleaned.replace(/\x1b\[[?][0-9;]*[hl]/g, '');
-  // OSC 序列
-  cleaned = cleaned.replace(/\x1b\][^\x07]*\x07/g, '');
-  cleaned = cleaned.replace(/\x1b\][^\x1b]*\x1b\\/g, '');
-
-  // 清理剩余的回车符（CR），只保留换行符（LF）
-  cleaned = cleaned.replace(/\r\n/g, '\n');  // Windows CRLF -> LF
-  cleaned = cleaned.replace(/\r/g, '');      // 单独 CR 删除
-
-  return cleaned;
-}
+import { decodeUtf8Tail, sanitizeTerminalText } from "./terminal-text.js";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 5002;
 const LOG_DIR = process.env.LOG_DIR || path.join(process.cwd(), "data", "logs");
@@ -186,15 +106,12 @@ app.get("/api/sessions/:name/log", async (req, res) => {
     const logFile = logPathFor(LOG_DIR, name);
     const tailBytes = Math.max(1000, Math.min(200_000, Number(req.query.tail || 20_000)));
 
-    // 读取文件内容
-    const content = await readFile(logFile, 'utf-8');
-
-    // 获取最后 N 字节
-    const start = Math.max(0, content.length - tailBytes);
-    const rawLog = content.slice(start);
+    // 按字节截取末尾内容，再安全解码 UTF-8，避免截断多字节字符导致乱码
+    const content = await readFile(logFile);
+    const rawLog = decodeUtf8Tail(content, tailBytes);
 
     // 应用 ANSI 清理
-    const cleanLog = stripAnsi(rawLog);
+    const cleanLog = sanitizeTerminalText(rawLog);
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.send(cleanLog);
