@@ -68,6 +68,8 @@ app.post("/api/sessions/:name/attach", async (req, res) => {
           });
         }
       );
+    } else {
+      stream.follower.refreshNow();
     }
 
     safeJson(res, { ok: true, session: name });
@@ -89,6 +91,8 @@ app.post("/api/sessions/:name/input", async (req, res) => {
     }
     await sendKeys(name, text, true, submitKey);
     console.log(`[input] session=${name} submitKey=${submitKey} textLen=${text.length}`);
+    const stream = streams.get(name);
+    if (stream?.follower) stream.follower.refreshNow();
     broadcast(name, { type: "input-activity", source: "unknown", timestamp: Date.now() });
     safeJson(res, { ok: true });
   } catch (e) {
@@ -101,6 +105,8 @@ app.post("/api/sessions/:name/control", async (req, res) => {
     const name = mustSessionName(req.params.name);
     const action = String(req.body?.action ?? "");
     await sendControl(name, action);
+    const stream = streams.get(name);
+    if (stream?.follower) stream.follower.refreshNow();
     safeJson(res, { ok: true });
   } catch (e) {
     httpError(res, e);
@@ -115,9 +121,7 @@ app.get("/api/sessions/:name/log", async (req, res) => {
       err.status = 404;
       throw err;
     }
-    const lines = Math.max(50, Math.min(5000, Number(req.query.lines || 400)));
-
-    const rawLog = await capturePane(name, -lines, -1);
+    const rawLog = await capturePane(name);
     const cleanLog = sanitizeTerminalText(rawLog);
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -144,6 +148,7 @@ wss.on("connection", (ws, req) => {
 
   const stream = getOrCreateStream(sessionName);
   stream.clients.add(ws);
+  if (stream.follower) stream.follower.refreshNow();
   if (stream.lastSnapshot && ws.readyState === ws.OPEN) {
     ws.send(JSON.stringify({ type: "snapshot", session: sessionName, data: stream.lastSnapshot }));
   }

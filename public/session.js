@@ -9,7 +9,15 @@ const toast = document.getElementById("toast");
 const submitKeySelect = document.getElementById("submitKeySelect");
 
 let autoScroll = true;
+const FORCE_FOLLOW_LATEST = true;
 const SUBMIT_KEY_STORAGE_KEY = "mobilecc.submitKey";
+const STALE_SYNC_MS = 2200;
+const WATCHDOG_MS = 1000;
+
+let ws = null;
+let reconnectTimer = null;
+let lastSnapshotAt = 0;
+let lastResyncAt = 0;
 
 function getSubmitKey() {
   if (!submitKeySelect) return "tab";
@@ -51,13 +59,27 @@ function append(text) {
 
 function replaceOutput(text) {
   pre.textContent = text;
+  if (FORCE_FOLLOW_LATEST) {
+    autoScroll = true;
+    out.scrollTop = out.scrollHeight;
+    document.getElementById("jumpBtn").style.display = "none";
+    return;
+  }
   if (autoScroll) {
     out.scrollTop = out.scrollHeight;
     document.getElementById("jumpBtn").style.display = "none";
+    return;
   }
+  document.getElementById("jumpBtn").style.display = "inline-block";
 }
 
 out.addEventListener("scroll", () => {
+  if (FORCE_FOLLOW_LATEST) {
+    autoScroll = true;
+    document.getElementById("autoscroll").textContent = "ON";
+    document.getElementById("jumpBtn").style.display = "none";
+    return;
+  }
   const nearBottom = (out.scrollHeight - out.scrollTop - out.clientHeight) < 40;
   autoScroll = nearBottom;
   document.getElementById("autoscroll").textContent = autoScroll ? "ON" : "OFF";
@@ -85,7 +107,7 @@ async function attach() {
 
 async function loadTail() {
   if (!session) return;
-  const r = await fetch(`/api/sessions/${encodeURIComponent(session)}/log?lines=400`);
+  const r = await fetch(`/api/sessions/${encodeURIComponent(session)}/log`);
   if (r.ok) {
     const t = await r.text();
     replaceOutput(t);
@@ -159,20 +181,59 @@ async function main() {
   await attach();
   await loadTail();
 
-  const wsProto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${wsProto}://${location.host}/ws?session=${encodeURIComponent(session)}`);
+  function scheduleReconnect(delayMs = 700) {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connectWs();
+    }, delayMs);
+  }
 
-  ws.onopen = () => conn.textContent = "ws connected";
-  ws.onclose = () => conn.textContent = "ws closed";
-  ws.onerror = () => conn.textContent = "ws error";
+  function connectWs() {
+    const wsProto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${wsProto}://${location.host}/ws?session=${encodeURIComponent(session)}`);
 
-  ws.onmessage = (ev) => {
-    const msg = JSON.parse(ev.data);
-    if (msg.type === "snapshot") replaceOutput(msg.data);
-    if (msg.type === "chunk") append(msg.data);
-    if (msg.type === "input-activity") showToast("📱 其他设备刚刚输入了内容");
-    if (msg.type === "error") append(`\n[server] ${msg.error || "stream error"}\n`);
-  };
+    ws.onopen = () => {
+      conn.textContent = "ws connected";
+      lastSnapshotAt = Date.now();
+    };
+    ws.onclose = () => {
+      conn.textContent = "ws reconnecting...";
+      scheduleReconnect(900);
+    };
+    ws.onerror = () => {
+      conn.textContent = "ws error";
+    };
+
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "snapshot") {
+        replaceOutput(msg.data);
+        lastSnapshotAt = Date.now();
+      }
+      if (msg.type === "chunk") {
+        append(msg.data);
+        lastSnapshotAt = Date.now();
+      }
+      if (msg.type === "input-activity") showToast("📱 其他设备刚刚输入了内容");
+      if (msg.type === "error") append(`\n[server] ${msg.error || "stream error"}\n`);
+    };
+  }
+
+  connectWs();
+
+  setInterval(async () => {
+    const now = Date.now();
+    const wsOpen = ws && ws.readyState === WebSocket.OPEN;
+    const isStale = !lastSnapshotAt || (now - lastSnapshotAt > STALE_SYNC_MS);
+    if (!wsOpen || isStale) {
+      if (now - lastResyncAt > 1200) {
+        lastResyncAt = now;
+        await loadTail();
+      }
+      if (!wsOpen) scheduleReconnect(500);
+    }
+  }, WATCHDOG_MS);
 }
 
 main();

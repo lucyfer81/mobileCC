@@ -111,19 +111,22 @@ export async function sendControl(sessionName, action) {
   throw err;
 }
 
-export async function capturePane(sessionName, startLine = -300, endLine = -1) {
+export async function capturePane(sessionName, startLine = null, endLine = null) {
   const target = await resolveActiveTarget(sessionName);
-  const { stdout } = await tmux([
+  const args = [
     "capture-pane",
     "-p",
     "-J",
     "-t",
-    target,
-    "-S",
-    String(startLine),
-    "-E",
-    String(endLine)
-  ]);
+    target
+  ];
+  if (Number.isInteger(startLine)) {
+    args.push("-S", String(startLine));
+  }
+  if (Number.isInteger(endLine)) {
+    args.push("-E", String(endLine));
+  }
+  const { stdout } = await tmux(args);
   return stdout;
 }
 
